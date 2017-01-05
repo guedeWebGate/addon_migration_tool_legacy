@@ -7,14 +7,24 @@ class DashboardMigrationBatchesExportController extends DashboardBaseController
 
     public function view($id = null)
     {
+        Log::addEntry('Call export with id =='.$id);
         if ($id) {
             $batch = MigrationBatch::getByID($id);
         }
         if (is_object($batch)) {
             $exporter = $batch->getExporter();
-            $files = $exporter->getReferencedFiles();
-            $this->set('batch', $batch);
-            $this->set('files', $files);
+            if (!$exporter->isExported()){
+                Log::addEntry('Is Exported... == false'); 
+                $files = $exporter->getReferencedFiles();
+                $exporter->saveToFileSystem();
+                $this->redirect('dashboard/migration/batches/export/'.$id.'/');
+            } else {
+                Log::addEntry('Is Exported == true, loadFromFileSystem()');
+                $exporter->loadFromFileSystem();
+                $files = $exporter->getReferencedFiles();                
+                $this->set('batch', $batch);
+                $this->set('files', $files);
+            }
         } else {
             throw new Exception(t('Invalid batch'));
         }
@@ -28,11 +38,27 @@ class DashboardMigrationBatchesExportController extends DashboardBaseController
         if (is_object($batch)) {
 
             $exporter = $batch->getExporter();
+            $exporter.loadFromFileSystem();
             $xml = $exporter->getContentXML();
             header('Content-disposition: attachment; filename="export.xml"');
             header('Content-type: "text/xml"; charset="utf8"');
             print $xml;
             exit;
+        } else {
+            throw new Exception(t('Invalid batch.'));
+        }
+    }
+
+    public function remove_temp($id = null)
+    {
+        if ($id) {
+            $batch = MigrationBatch::getByID($id);
+        }
+        if (is_object($batch)) {
+
+            $exporter = $batch->getExporter();
+            $exporter->clearFromFileSystem();
+            $this->redirect('dashboard/migration/batches/view_batch/'.$id.'/');
         } else {
             throw new Exception(t('Invalid batch.'));
         }

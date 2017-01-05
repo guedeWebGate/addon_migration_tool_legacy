@@ -56,7 +56,15 @@ $form = Loader::helper('form');
     <div class="well">
         <a href="<?=View::url('/dashboard/migration/batches/add_pages', $batch->getID())?>" class="btn btn-primary"><?=t('Add Pages')?></a>
         <a href="<?=View::url('/dashboard/migration/batches/export', $batch->getID())?>" class="btn btn-primary"><?=t('Export Batch')?></a>
+        <?
+            if ($batch->getExporter()->isExported()) {
+                echo('<a href="');
+                echo(View::url('/dashboard/migration/batches/export','remove_temp', $batch->getID()));
+                echo('" class="btn btn-default">Clean Temporary Files</a>');
+            }
+        ?>
         <button type="submit" onclick="return confirm('<?=t('Delete the Batch?')?>')" name="action" value="delete" class="btn danger btn-danger"><?=t('Delete Batch')?></button>
+        <a href="<?=View::url('dashboard/migration/batches/')?>"><?=t('back to overview')?></a>
     </div>
 
         <? if (count($pages)) { ?>

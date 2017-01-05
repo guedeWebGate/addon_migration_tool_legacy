@@ -5,7 +5,7 @@ class MigrationBatchExporter
 
 	protected $batch;
 	protected $parsed = false;
-	protected $x;
+	protected $xmlValue;
 
 	public function __construct(MigrationBatch $batch)
 	{
@@ -15,16 +15,18 @@ class MigrationBatchExporter
 	protected function parse()
 	{
 		Loader::library('content/exporter');
-		$this->x = new SimpleXMLElement("<?xml version=\"1.0\" encoding=\"UTF-8\"?><concrete5-cif></concrete5-cif>");
-		$this->x->addAttribute('version', '1.0');
+		$x = new SimpleXMLElement("<?xml version=\"1.0\" encoding=\"UTF-8\"?><concrete5-cif></concrete5-cif>");
+		$x->addAttribute('version', '1.0');
 
 		$pages = $this->batch->getPages();
 		if (count($pages)) {
-			$top = $this->x->addChild('pages');
+			$top = $x->addChild('pages');
 			foreach($pages as $c) {
 				$c->export($top);
 			}
 		}
+		$this->xmlValue = $x->asXML();
+		$this->parsed = true;
 	}
 
 	public function getContentXML()
@@ -32,10 +34,7 @@ class MigrationBatchExporter
 		if (!$this->parsed) {
 			$this->parse();
 		}
-		$xml = $this->x->asXML();
-		// this line is screwing up blocks that need to control their output specifically, like markdown
-		//$xml = preg_replace('/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]/', '', $xml);
-		return $xml;
+		return $this->xmlValue;
 	}
 
 	/**
@@ -79,6 +78,54 @@ class MigrationBatchExporter
 			}
 		}
 		return $files;
+	}
+
+	public function isExported() {
+		$filePath = $this->getFilePath();
+		$fileName = $this->buildFileName($filePath);
+		return file_exists($fileName);
+	}
+
+	public function saveToFileSystem() {
+		if (!$this->parsed) {
+			$this->parse();
+		}
+		$xml = $this->getContentXML();
+		Log::addEntry('Save '. $xml . ' to file');
+		$filePath = $this->getFilePath();
+		$fileName = $this->buildFileName($filePath);
+		$filecurrent = fopen($fileName,'w' );
+		fwrite($filecurrent, $xml);
+		fclose($filecurrent);
+	}
+
+	public function loadFromFileSystem() {
+		$filePath = $this->getFilePath();
+		$fileName = $this->buildFileName($filePath);
+		$fileCurrent = fopen($fileName, 'r');
+		$this->xmlValue = fread($fileCurrent, filesize($fileName));
+		$this->parsed = true;
+	}
+
+	public function clearFromFileSystem() {
+		$filePath = $this->getFilePath();
+		$fileName = $this->buildFileName($filePath);
+		unlink($fileName);		
+	}
+
+	private function getFilePath() {
+		$fh = Loader::helper('file');
+
+		$path = $fh->getTemporaryDirectory();
+		$filePath = $path .'/migrationTool';
+		if (!is_dir($filePath)) {
+			mkdir($filePath);
+		}
+		return $filePath;		
+	}
+
+	private function buildFileName($pathCurrent) {
+		return $pathCurrent .'/' . $this->batch->getID() .'.xml';
 	}
 
 }
